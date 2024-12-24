@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Gastos</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        input[type="number"] {
+            width: 80%; /* Diminuído para ajustar largura */
+            box-sizing: border-box;
+        }
+        input[type="date"] {
+            width: 10%; /* Diminuído para ajustar largura da data inicial */
+            box-sizing: border-box;
+        }
+        input[type="text"] {
+            width: 100%;
+            box-sizing: border-box;
+        }
+        th:nth-child(1), td:nth-child(1),
+        th:nth-child(2), td:nth-child(2) {
+            width: 10%; /* Reduzindo largura das colunas Data e Dia da Semana */
+        }
+        th:nth-child(4), td:nth-child(4),
+        th:nth-child(5), td:nth-child(5) {
+            width: 10%; /* Reduzindo largura das colunas Despesa e Receita */
+        }
+    </style>
+</head>
+<body>
+    <h1>Controle de Gastos</h1>
+
+    <label for="data-inicial">Data Inicial:</label>
+    <input type="date" id="data-inicial">
+
+    <button onclick="gerarTabela()">Gerar Tabela</button>
+    <button onclick="baixarPDF()">Baixar PDF</button>
+
+    <table id="tabela-controle-gastos">
+        <thead>
+            <tr>
+                <th>Data</th>
+                <th>Dia da Semana</th>
+                <th>Justificativa</th>
+                <th>Despesa (R$)</th>
+                <th>Receita (R$)</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <script>
+        function criarTabelaControleGastos(dataInicial) {
+            const tabelaBody = document.querySelector('#tabela-controle-gastos tbody');
+            tabelaBody.innerHTML = ''; // Limpa a tabela antes de gerar
+
+            function adicionarLinha(data) {
+                const linha = document.createElement('tr');
+
+                const colunaData = document.createElement('td');
+                colunaData.textContent = data.toLocaleDateString('pt-BR');
+                linha.appendChild(colunaData);
+
+                const colunaDiaSemana = document.createElement('td');
+                const diasSemana = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+                colunaDiaSemana.textContent = diasSemana[data.getDay()];
+                linha.appendChild(colunaDiaSemana);
+
+                const colunaJustificativa = document.createElement('td');
+                const inputJustificativa = document.createElement('input');
+                inputJustificativa.type = 'text';
+                inputJustificativa.placeholder = 'Justificativa';
+                colunaJustificativa.appendChild(inputJustificativa);
+                linha.appendChild(colunaJustificativa);
+
+                const colunaValorGasto = document.createElement('td');
+                const inputValorGasto = document.createElement('input');
+                inputValorGasto.type = 'number';
+                inputValorGasto.step = '0.01';
+                inputValorGasto.placeholder = '0,00';
+                colunaValorGasto.appendChild(inputValorGasto);
+                linha.appendChild(colunaValorGasto);
+
+                const colunaValorReceita = document.createElement('td');
+                const inputValorReceita = document.createElement('input');
+                inputValorReceita.type = 'number';
+                inputValorReceita.step = '0.01';
+                inputValorReceita.placeholder = '0,00';
+                colunaValorReceita.appendChild(inputValorReceita);
+                linha.appendChild(colunaValorReceita);
+
+                tabelaBody.appendChild(linha);
+            }
+
+            const dataInicialObj = new Date(dataInicial);
+            const ano = dataInicialObj.getFullYear();
+            const mes = dataInicialObj.getMonth() + 1;
+            const diasNoMes = new Date(ano, mes + 1, 0).getDate();
+
+            for (let dia = 1; dia <= diasNoMes; dia++) {
+                const data = new Date(ano, mes, dia);
+                adicionarLinha(data);
+            }
+        }
+
+        function gerarTabela() {
+            const dataInicial = document.getElementById('data-inicial').value;
+
+            if (!dataInicial) {
+                alert('Por favor, selecione a data inicial.');
+                return;
+            }
+
+            criarTabelaControleGastos(dataInicial);
+        }
+
+        async function baixarPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ format: 'a4' });
+
+            // Seleciona a tabela HTML
+            const tabela = document.getElementById('tabela-controle-gastos');
+
+            // Define os dados e o cabeçalho para o PDF
+            const rows = [];
+            const headers = ['Data', 'Dia da Semana', 'Justificativa', 'Despesa (R$)', 'Receita (R$)'];
+
+            Array.from(tabela.rows).forEach((row, rowIndex) => {
+                if (rowIndex > 0) { // Ignora o cabeçalho HTML
+                    const rowData = Array.from(row.cells).map((cell, cellIndex) => {
+                        if (cellIndex === 2 || cellIndex === 3 || cellIndex === 4) {
+                            const input = cell.querySelector('input');
+                            return input ? input.value : '';
+                        } else {
+                            return cell.textContent;
+                        }
+                    });
+                    rows.push(rowData);
+                }
+            });
+
+            // Configura o estilo da tabela no PDF
+            doc.autoTable({
+                head: [headers],
+                body: rows,
+                styles: {
+                    fontSize: 10, // Define fonte menor
+                    cellPadding: 2,
+                },
+                theme: 'grid',
+                margin: { top: 20 },
+
+                columnStyles: {
+                    0: { cellWidth: 25 }, // Coluna 'Data'
+                    1: { cellWidth: 30 }, // Coluna 'Dia da Semana'
+                    2: { cellWidth: 70 }, // Coluna 'Justificativa'
+                    3: { cellWidth: 30 }, // Coluna 'Despesa (R$)'
+                    4: { cellWidth: 30 }, // Coluna 'Receita (R$)'
+            },
+            });
+
+            // Salva o PDF
+            doc.save('controle_de_gastos.pdf');
+        }
+    </script>
+</body>
+</html>
